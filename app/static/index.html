@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Company Knowledge Assistant</title>
+  <link rel="stylesheet" href="/static/style.css"/>
+  <style>
+    .row { display:flex; gap:.5rem; align-items:center; }
+    .grow { flex:1; }
+    .muted { color:#6b7280; font-size:.9rem; }
+    .caps { text-transform:uppercase; letter-spacing:.04em; font-size:.8rem; color:#6b7280; }
+    .source-list { margin-top:.5rem; }
+    .source-item { padding:.4rem .6rem; border-radius:8px; background:#f3f4f6; margin:.25rem 0; }
+    .source-title { font-weight:600; color:#111827; }
+    .source-meta { font-size:.85rem; color:#4b5563; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="toolbar">
+      <div class="brand">Company Knowledge Assistant</div>
+      <div class="actions">
+        <span id="ingestStatus" class="pill pill-idle">Idle</span>
+        <button id="ingestBtn">Ingest Data</button>
+      </div>
+    </header>
+
+    <p class="subtitle">Ask a question about your company documents.</p>
+
+    <div class="card">
+      <div class="row">
+        <textarea id="question" class="grow" placeholder="Type your question here...&#10;Tip: Press Ctrl/⌘+Enter to ask"></textarea>
+      </div>
+      <div class="row" style="justify-content: space-between; margin-top:.5rem;">
+        <div class="muted">Answers are grounded in your ingested docs.</div>
+        <div class="row">
+          <button id="clearBtn" class="secondary" style="background:#eef2ff;color:#1f2937;">Clear</button>
+          <button id="askBtn">Ask</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="responseCard" class="card hidden">
+      <h2 style="margin:0 0 .5rem 0">Answer</h2>
+      <div id="answer"></div>
+
+      <div id="sourcesBlock" style="margin-top:1rem;">
+        <div class="caps">Sources</div>
+        <div id="sources" class="source-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const ingestBtn = document.getElementById('ingestBtn');
+    const ingestStatus = document.getElementById('ingestStatus');
+    const askBtn = document.getElementById('askBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const textarea = document.getElementById('question');
+    const answerDiv = document.getElementById('answer');
+    const respCard = document.getElementById('responseCard');
+    const sourcesList = document.getElementById('sources');
+    const sourcesBlock = document.getElementById('sourcesBlock');
+
+    function setStatus(s, extra) {
+      ingestStatus.className = 'pill';
+      if (s === 'running') ingestStatus.classList.add('pill-running');
+      else if (s === 'succeeded') ingestStatus.classList.add('pill-ok');
+      else if (s === 'failed') ingestStatus.classList.add('pill-err');
+      else ingestStatus.classList.add('pill-idle');
+      ingestStatus.textContent = s.charAt(0).toUpperCase() + s.slice(1) + (extra ? ` (${extra})` : '');
+    }
+
+    async function refreshStatus() {
+      try {
+        const r = await fetch('/ingest/status');
+        const d = await r.json();
+        if (!d.ok) return;
+        const st = d.status || 'idle';
+        const extra = st === 'failed'
+          ? (d.error || 'error')
+          : (d.stats ? `chunks: ${d.stats.chunks}` : '');
+        setStatus(st, extra);
+      } catch(e) {
+        setStatus('failed', 'status error');
+      }
+    }
+
+
+function renderSources(sources) {
+  if (!sources || !sources.length) {
+    sourcesBlock.style.display = 'none';
+    sourcesList.innerHTML = '';
+    return;
+  }
+  sourcesBlock.style.display = '';
+  sourcesList.innerHTML = sources.map(text => `
+    <div class="source-item">
+      <div class="source-content">${(text ?? '')
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+    </div>
+  `).join('');
+}
+
+    ingestBtn.addEventListener('click', async () => {
+      ingestBtn.disabled = true;
+      setStatus('running');
+      try {
+        const res = await fetch('/ingest', { method: 'POST' });
+        await refreshStatus(); // immediate peek
+        if (res.ok) {
+          const poll = setInterval(async () => {
+            await refreshStatus();
+            if (!ingestStatus.classList.contains('pill-running')) {
+              clearInterval(poll);
+              ingestBtn.disabled = false;
+            }
+          }, 2000);
+        } else {
+          ingestBtn.disabled = false;
+        }
+      } catch (e) {
+        setStatus('failed', e?.message || 'ingest error');
+        ingestBtn.disabled = false;
+      }
+    });
+
+    async function submitQuestion() {
+      const q = textarea.value.trim();
+      if (!q) { alert("Please enter a question."); return; }
+      askBtn.disabled = true;
+      answerDiv.innerHTML = "<em>Thinking...</em>";
+      renderSources([]);
+      respCard.classList.remove("hidden");
+      try {
+        const res = await fetch('/ask', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ question: q })
+        });
+        const data = await res.json();
+        answerDiv.innerHTML = (data.answer || '').replace(/\n/g, '<br>');
+        renderSources(data.sources || []);
+      } catch (err) {
+        answerDiv.innerHTML = "<span class='error'>Error: " + (err?.message || 'request failed') + "</span>";
+        renderSources([]);
+      } finally {
+        askBtn.disabled = false;
+      }
+    }
+
+    askBtn.addEventListener('click', submitQuestion);
+    textarea.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') submitQuestion();
+    });
+
+    clearBtn.addEventListener('click', () => {
+      textarea.value = "";
+      answerDiv.innerHTML = "";
+      renderSources([]);
+      respCard.classList.add("hidden");
+    });
+
+    // initial status on load
+    refreshStatus();
+  </script>
+</body>
+</html>

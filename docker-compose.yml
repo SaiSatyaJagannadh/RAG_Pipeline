@@ -1,0 +1,45 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: cka-db
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cka-app
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env 
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8000/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+    restart: unless-stopped
+
+
+volumes:
+  pgdata:
+  
