@@ -64,7 +64,7 @@ async def ingest_status():
 async def ask(q: Ask):
     start = time.perf_counter()
     
-    #TODO: Call RAG pipeline
+    #TODO: Call RAG pipeline mine king
    
     answer, sources = await answer_with_docs_async(q.question)
 
