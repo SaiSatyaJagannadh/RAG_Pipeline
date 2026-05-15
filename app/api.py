@@ -80,7 +80,7 @@ async def ask(q: Ask):
     
 
     elapsed = time.perf_counter() - start
-    print(f"⏱️ /ask execution took {elapsed:.2f} seconds")
+    print(f"⏱️ /ask execution took {elapsed:.2f} seconds a")
     
 
     
