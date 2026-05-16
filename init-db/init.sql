@@ -7,3 +7,4 @@ CREATE TABLE IF NOT EXISTS langchain_pg_embedding (
     langchain_metadata json,
     category text                     
 );
+---King size
