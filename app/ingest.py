@@ -70,7 +70,7 @@ async def run_ingest_async() -> dict:
     store = await get_vector_store()
     await store.aadd_documents(chunks)
     print(f"INGEST: {len(docs)} docs, {len(chunks)} chunks")
-    #await _create_index(store)
+    await _create_index(store)
 
     return {"documents": len(docs),"chunks":len(chunks)}
 
