@@ -52,7 +52,16 @@ def _chunk(docs: List[Document]) -> List[Document]:
         print(f"INGEST ERROR: chunking failed")
         traceback.print_exc()
         raise
-
+    
+async def _create_index(store):
+    index = HNSWIndex(
+        name="hnsw_idx",
+        distance_strategy=DistanceStrategy.COSINE_DISTANCE,
+        m=16,
+        ef_construction=64
+    )
+    await store.aapply_vector_index(index,concurrently=True)
+    print("Index Created Succesfully")
 
 
 async def run_ingest_async() -> dict:
