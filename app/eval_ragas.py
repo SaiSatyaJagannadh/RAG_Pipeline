@@ -32,7 +32,6 @@ def print_eval_res(eval_result):
     for k, v in means.items():
         print(f"- {k}: {v:.3f}")
 
-
 async def evaluate_rag_system(test_path="../seed/qna_test.json"):
     test_data = load_jsonl(test_path)
     results = []
@@ -46,19 +45,6 @@ async def evaluate_rag_system(test_path="../seed/qna_test.json"):
         answer, contexts = res['answer'], res['contexts']
 
         #TODO
-        results.append(SingleTurnSample(
-            user_input = question,
-            response = answer,
-            retrieved_contexts = contexts,
-            reference = reference_answer
-        ))
-
-    ds = EvaluationDataset(results)
-    metrics = [faithfulness,answer_relevancy,context_precision,context_recall]
-    run_config = RunConfig(max_workers=16,timeout = 30)
-    eval_result = evaluate(dataset=ds,metrics=metrics,llm=oai_llm,run_config=run_config)
-    print("RAGAS Evals Results")
-    print_eval_res(eval_result)
        
         
 

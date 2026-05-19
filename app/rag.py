@@ -60,19 +60,19 @@ async def _build_chain():
     rag_chain = create_retrieval_chain(retriever, doc_chain)
     return rag_chain
 
-async def answer_with_docs_async(question: str,category:str) -> Tuple[str, List[str],List[str]]:
-    chain = await _build_chain(category)
+async def answer_with_docs_async(question: str) -> Tuple[str, List[str]]:
+    
+    chain = await _build_chain()
     result = await chain.ainvoke({"input": question})
-    answer: str = result["answer"]
+    answer= result["answer"]
 
+    sources=[]
     docs: List[Document] = result["context"]
     
-    unique_sources = {d.metadata.get("source") for d in docs if d.metadata.get("source")}
+    unique_sources = {d.metadata.get("source") for d in docs}
     sources = sorted(unique_sources)
 
-    contexts = []
-    for d in docs:
-        contexts.append(d.page_content)
 
 
-    return answer, sources,contexts
+
+    return answer, sources
