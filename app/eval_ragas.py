@@ -2,11 +2,18 @@ import asyncio
 import json
 import pandas as pd
 import requests
+from dotenv import load_dotenv
+load_dotenv()
 
 from ragas import evaluate
 from ragas import SingleTurnSample, EvaluationDataset
 from langchain_openai import ChatOpenAI
-from ragas.metrics import faithfulness, answer_relevancy, context_precision, context_recall
+from ragas.metrics import (
+    _Faithfulness,
+    _ResponseRelevancy,
+    _LLMContextPrecisionWithReference,
+    _LLMContextRecall,
+)
 from ragas.run_config import RunConfig
 
 oai_llm = ChatOpenAI(model="gpt-4o-mini")
@@ -41,12 +48,52 @@ async def evaluate_rag_system(test_path="../seed/qna_test.json"):
         reference_answer = item["answer"]
         url = 'http://localhost:8000/ask'
         myobj = {'question': question}
-        res = requests.post(url, json = myobj).json()
-        answer, contexts = res['answer'], res['contexts']
 
-        #TODO
-       
-        
+        try:
+            response = requests.post(url, json=myobj, timeout=30)
+            response.raise_for_status()
+            if not response.text.strip():
+                print(f"[WARN] Empty response for question: {question!r}")
+                continue
+            res = response.json()
+        except requests.exceptions.HTTPError as e:
+            print(f"[ERROR] HTTP {response.status_code} for question: {question!r}\n  {e}")
+            continue
+        except requests.exceptions.JSONDecodeError:
+            print(f"[ERROR] Non-JSON response for question: {question!r}")
+            print(f"  Raw body: {response.text[:300]!r}")
+            continue
+        except requests.exceptions.RequestException as e:
+            print(f"[ERROR] Request failed for question: {question!r}\n  {e}")
+            continue
+
+        answer = res['answer']
+        contexts = res['contexts']
+
+        results.append(SingleTurnSample(
+            user_input=question,
+            response=answer,
+            retrieved_contexts=contexts,
+            reference=reference_answer
+        ))
+
+    if not results:
+        print("[ABORT] No successful responses — check that your server is running on :8000")
+        return
+
+    ds = EvaluationDataset(results)
+    metrics = [
+        _Faithfulness(llm=oai_llm),
+        _ResponseRelevancy(llm=oai_llm),
+        _LLMContextPrecisionWithReference(llm=oai_llm),
+        _LLMContextRecall(llm=oai_llm),
+    ]
+    run_config = RunConfig(max_workers=16, timeout=30)
+    eval_result = evaluate(dataset=ds, metrics=metrics, run_config=run_config)
+    print("RAGAS Evals Results")
+    print_eval_res(eval_result)
 
 if __name__ == "__main__":
     asyncio.run(evaluate_rag_system())
+
+    

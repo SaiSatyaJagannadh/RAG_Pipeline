@@ -73,7 +73,8 @@ async def answer_with_docs_async(question: str) -> Tuple[str, List[str],List[str
     sources = sorted(unique_sources)
     contexts=[]
     for d in docs :
-        contexts.append(d.page_context)
+        contexts.append(d.page_content)
+
 
 
 
