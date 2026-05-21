@@ -88,7 +88,8 @@ async def evaluate_rag_system(test_path="../seed/qna_test.json"):
         _LLMContextPrecisionWithReference(llm=oai_llm),
         _LLMContextRecall(llm=oai_llm),
     ]
-    run_config = RunConfig(max_workers=16, timeout=30)
+    run_config = RunConfig(max_workers=4, timeout=120, max_retries=3)
+
     eval_result = evaluate(dataset=ds, metrics=metrics, run_config=run_config)
     print("RAGAS Evals Results")
     print_eval_res(eval_result)
@@ -96,4 +97,3 @@ async def evaluate_rag_system(test_path="../seed/qna_test.json"):
 if __name__ == "__main__":
     asyncio.run(evaluate_rag_system())
 
-    
