@@ -60,7 +60,7 @@ async def _build_chain():
     rag_chain = create_retrieval_chain(retriever, doc_chain)
     return rag_chain
 
-async def answer_with_docs_async(question: str) -> Tuple[str, List[str]]:
+async def answer_with_docs_async(question: str) -> Tuple[str, List[str],List[str]]:
     
     chain = await _build_chain()
     result = await chain.ainvoke({"input": question})
@@ -71,8 +71,10 @@ async def answer_with_docs_async(question: str) -> Tuple[str, List[str]]:
     
     unique_sources = {d.metadata.get("source") for d in docs}
     sources = sorted(unique_sources)
+    contexts=[]
+    for d in docs :
+        contexts.append(d.page_context)
 
 
 
-
-    return answer, sources #rag,api,evals needs ro change 
+    return answer, sources,contexts #rag,api,evals needs ro change 
