@@ -48,13 +48,15 @@ set_llm_cache(
 
 async def _build_chain():
     store = await get_vector_store()  
-    
-    
-    
-    
-    
-    retriever=store.as_retriever(search_kwargs={"k": int(os.getenv("RETRIEVAL_K","5"))})
-
+    base_retriever=store.as_retriever(search_kwargs={"k": int(os.getenv("RETRIEVAL_K","5"))})
+    compressor = CohereRerank(
+        top_n = 3,
+        model = "rerank-multilingual-v3.0"
+    )
+    retriever = ContextualCompressionRetriever(
+        base_retriever=base_retriever,
+        base_compressor = compressor
+    )
     llm = ChatOpenAI(model="gpt-4o-mini")
     doc_chain = create_stuff_documents_chain(llm, PROMPT)
     rag_chain = create_retrieval_chain(retriever, doc_chain)
