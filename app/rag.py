@@ -40,7 +40,7 @@ set_llm_cache(
     RedisSemanticCache(
         redis_url=REDIS_URL,
         embeddings =embeddings,
-        distance_threshold = 0.98
+        distance_threshold = 10
     )
 )
 
@@ -48,7 +48,7 @@ set_llm_cache(
 
 async def _build_chain():
     store = await get_vector_store()  
-    base_retriever=store.as_retriever(search_kwargs={"k": int(os.getenv("RETRIEVAL_K","5"))})
+    base_retriever=store.as_retriever(search_kwargs={"k": int(os.getenv("RETRIEVAL_K","10"))})
     compressor = CohereRerank(
         top_n = 3,
         model = "rerank-multilingual-v3.0"
