@@ -20,23 +20,31 @@ def _load_docs(base: str = DATA_DIR) -> List[Document]:
         if os.path.isdir(path) or os.path.basename(path).startswith("."):
             continue
         ext = os.path.splitext(path)[1].lower()
+        relative_path = os.path.relpath(path,base)
+        category = relative_path.split(os.sep)[0] if os.sep in relative_path else "general"
+
+
         try:
-            #loaded_docs = []
+            loaded_docs = []
             if ext == ".md":
                 for d in UnstructuredMarkdownLoader(path).load():
-                    docs.append(d)
+                    loaded_docs.append(d)
             elif ext == ".pdf":
                 for d in PyMuPDFLoader(path).load():
-                    docs.append(d)
+                    loaded_docs.append(d)
             elif ext == ".docx":
                 for d in UnstructuredWordDocumentLoader(path).load():
-                    docs.append(d)
+                    loaded_docs.append(d)
             elif ext == ".txt":
                 for d in TextLoader(path).load():
-                    docs.append(d)
+                    loaded_docs.append(d)
+            
+            for d in loaded_docs:
+                d.metadata["category"] = category
+                docs.append(d)
         except Exception:
             print(f"INGEST ERROR: failed to load {path}")
-            traceback.print_exc()#list
+            traceback.print_exc()
 
     return docs
         
