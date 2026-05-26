@@ -48,7 +48,10 @@ set_llm_cache(
 
 async def _build_chain():
     store = await get_vector_store()  
-    base_retriever=store.as_retriever(search_kwargs={"k": int(os.getenv("RETRIEVAL_K","5"))})
+    search_kwargs={"k": int(os.getenv("RETRIEVAL_K","5"))}
+    if category:
+        search_kwargs["filter"] = {"category":category}
+    base_retriever = store.as_retriever(search_kwargs=search_kwargs)
     compressor = CohereRerank(
         top_n = 3,
         model = "rerank-multilingual-v3.0"
@@ -62,9 +65,9 @@ async def _build_chain():
     rag_chain = create_retrieval_chain(retriever, doc_chain)
     return rag_chain
 
-async def answer_with_docs_async(question: str) -> Tuple[str, List[str],List[str]]:
+async def answer_with_docs_async(question: str,category:str) -> Tuple[str, List[str],List[str]]:
     
-    chain = await _build_chain()
+    chain = await _build_chain(category)
     result = await chain.ainvoke({"input": question})
     answer= result["answer"]
 
