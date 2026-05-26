@@ -66,8 +66,7 @@ async def ask(q: Ask):
     
     #TODO: Call RAG pipeline mine king you
     category="guides"
-    answer, sources ,contexts= await answer_with_docs_async
-    (q.question,category)
+    answer, sources, contexts = await answer_with_docs_async(q.question, category)
 
     elapsed = time.perf_counter() - start
     print(f"⏱️ /ask execution took {elapsed:.2f} seconds")

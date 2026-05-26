@@ -46,7 +46,7 @@ set_llm_cache(
 
 
 
-async def _build_chain():
+async def _build_chain( category:str):
     store = await get_vector_store()  
     search_kwargs={"k": int(os.getenv("RETRIEVAL_K","5"))}
     if category:
