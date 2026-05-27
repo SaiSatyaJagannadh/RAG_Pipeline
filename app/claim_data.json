@@ -1,0 +1,22 @@
+{
+  "employee": {
+    "id": "E7842",
+    "name": "Rajesh Kumar",
+    "department": "Sales",
+    "designation": "Senior Account Executive",
+    "location": "Mumbai"
+  },
+  "claims": [
+    {
+      "claim_id": "EXP-1001",
+      "date": "2025-10-05",
+      "category": "travel",
+      "description": "Travel expenses for client meeting in Delhi",
+      "amount": 11000,
+      "currency": "INR",
+      "receipt_available": true,
+      "pre_approved": false
+    }
+   
+  ]
+}
