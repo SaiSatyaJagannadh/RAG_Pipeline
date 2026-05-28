@@ -12,7 +12,7 @@
       "date": "2025-10-05",
       "category": "travel",
       "description": "Travel expenses for client meeting in Delhi",
-      "amount": 11000,
+      "amount": 200000,
       "currency": "INR",
       "receipt_available": true,
       "pre_approved": false

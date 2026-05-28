@@ -7,7 +7,8 @@ import streamlit as st
 from langchain_openai import ChatOpenAI
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain.agents import create_agent
-
+from dotenv import load_dotenv
+load_dotenv()
 # ----------------------------
 # MCP + Agent Configuration
 # ----------------------------
