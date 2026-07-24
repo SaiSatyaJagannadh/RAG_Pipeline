@@ -121,7 +121,7 @@ let category = '';   // '' = search everything
 
 /* ---------- documents sidebar ---------- */
 async function loadDocs(){
-  const d = await (await fetch('/docs')).json().catch(() => ({categories:[]}));
+  const d = await fetch('/docs').then(r => r.json()).catch(() => ({categories:[]}));
   $('#docs').innerHTML = (d.categories || []).map(c => `
     <div class="grp">
       <div class="caps" style="margin:.6rem 0 .2rem">${esc(c.category)}</div>
