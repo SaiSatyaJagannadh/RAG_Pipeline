@@ -2,6 +2,7 @@ import json
 import asyncio
 import os
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -59,8 +60,46 @@ Claim:
 # ----------------------------
 # Helpers
 # ----------------------------
+EXTRACT_PROMPT = """Extract every expense claim in this document as strict JSON matching:
+
+{"employee": {"id": ..., "name": ..., "department": ..., "designation": ..., "location": ...},
+ "claims": [{"claim_id": ..., "date": ..., "category": ..., "description": ...,
+             "amount": ..., "currency": ..., "receipt_available": ..., "pre_approved": ...}]}
+
+amount is a number, receipt_available and pre_approved are booleans, date is YYYY-MM-DD.
+Use null for anything the document does not state. Return only the JSON object.
+
+Document:
+"""
+
+
 def load_claims_from_bytes(file_bytes: bytes) -> Dict[str, Any]:
     return json.loads(file_bytes.decode("utf-8"))
+
+
+def extract_claims_from_document(file_bytes: bytes, filename: str, model: str) -> Dict[str, Any]:
+    """PDF/Word claim doc -> the same {employee, claims} dict a claims JSON would give."""
+    from app.ingest import load_file
+
+    suffix = Path(filename).suffix.lower()
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+            tmp.write(file_bytes)
+            tmp_path = tmp.name
+        docs = load_file(tmp_path, "claims")
+    finally:
+        if tmp_path:
+            os.unlink(tmp_path)
+
+    text = "\n\n".join(d.page_content for d in docs).strip()
+    if not text:
+        raise ValueError(f"No text could be read from {filename}")
+
+    llm = ChatOpenAI(model=model, temperature=0).bind(
+        response_format={"type": "json_object"}
+    )
+    return json.loads(llm.invoke(EXTRACT_PROMPT + text[:20000]).content)
 
 async def build_agent(mcp_url: str, model: str = "gpt-4o-mini", temperature: float = 0.0):
     client=MultiServerMCPClient(
@@ -123,7 +162,8 @@ async def process_claims(agent, data: Dict[str, Any]) -> List[Dict[str, Any]]:
 # ----------------------------
 # Streamlit App
 # ----------------------------
-st.set_page_config(page_title="HR Expense Agent (MCP)", page_icon="💼", layout="wide")
+st.set_page_config(page_title="HR Expense Agent (MCP)", page_icon="💼", layout="wide",
+                   initial_sidebar_state="expanded")
 st.title("💼 HR Expense Compliance Agent (MCP + RAG)")
 
 with st.sidebar:
@@ -158,7 +198,8 @@ with st.sidebar:
                 else:
                     st.success(f"Ingested {dest.name} → {stats['chunks']} chunks into '{dest.parent.name}'")
 
-uploaded = st.file_uploader("Upload claims JSON", type=["json"])
+uploaded = st.file_uploader("Upload claims (JSON, PDF or Word)", type=["json", "pdf", "docx"],
+                            help="PDF/Word claim documents are read and converted to claims automatically.")
 
 col1, col2 = st.columns([1, 1])
 with col1:
@@ -171,15 +212,28 @@ if run_btn:
         st.error("Please upload a claims JSON file first.")
         st.stop()
 
+    is_json = Path(uploaded.name).suffix.lower() == ".json"
     try:
-        data = load_claims_from_bytes(uploaded.getvalue())
+        if is_json:
+            data = load_claims_from_bytes(uploaded.getvalue())
+        else:
+            with st.spinner(f"Reading claims out of {uploaded.name}..."):
+                data = extract_claims_from_document(uploaded.getvalue(), uploaded.name, model)
     except Exception as e:
-        st.error(f"Failed to parse JSON: {e}")
+        st.error(f"Failed to read {uploaded.name}: {e}")
+        st.stop()
+
+    if not data.get("claims"):
+        st.error(f"No claims found in {uploaded.name}.")
         st.stop()
 
     employee = data.get("employee", {})
     st.subheader("Employee")
     st.json(employee)
+
+    if not is_json:
+        with st.expander(f"Claims extracted from {uploaded.name} — check before running", expanded=True):
+            st.json(data.get("claims"))
 
     with st.spinner("Connecting to MCP server and building agent..."):
         try:

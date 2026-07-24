@@ -20,7 +20,7 @@ LOADERS = {
 }
 assert LOADERS.keys() == SUPPORTED_EXTS, "LOADERS and uploads.SUPPORTED_EXTS drifted"
 
-def _load_one(path: str, category: str) -> List[Document]:
+def load_file(path: str, category: str) -> List[Document]:
     """Load a single file. Returns [] for unsupported extensions."""
     loader = LOADERS.get(os.path.splitext(path)[1].lower())
     if loader is None:
@@ -41,7 +41,7 @@ def _load_docs(base: str = DATA_DIR) -> List[Document]:
         category = relative_path.split(os.sep)[0] if os.sep in relative_path else "general"
 
         try:
-            docs.extend(_load_one(path, category))
+            docs.extend(load_file(path, category))
         except Exception:
             print(f"INGEST ERROR: failed to load {path}")
             traceback.print_exc()
@@ -85,7 +85,7 @@ async def run_ingest_async() -> dict:
 
 async def ingest_file_async(path: str, category: str) -> dict:
     """Ingest one already-saved file. HNSW index built by run_ingest_async covers new rows."""
-    docs = _load_one(path, category)
+    docs = load_file(path, category)
     if not docs:
         raise ValueError(f"Unsupported file type: {path}")
     chunks = _chunk(docs)
