@@ -15,7 +15,8 @@ from mcp.server.fastmcp import FastMCP
 
 # ---- Your RAG + Ingest imports ----
 from .rag import answer_with_docs_async            # must return (answer, sources, contexts)
-from .ingest import run_ingest_async               # your async ingest job
+from .ingest import run_ingest_async, ingest_file_async
+from .uploads import safe_dest
 
 # ========== MCP SERVER ==========
 mcp = FastMCP(
@@ -144,6 +145,28 @@ async def ingest_status_handler(request: Request):
     """GET /ingest/status"""
     return JSONResponse({"ok": True, **_ingest_last})
 
+async def upload_handler(request: Request):
+    """POST /upload (multipart: file, category) -> save under data/<category>/ and ingest it."""
+    form = await request.form()
+    upload = form.get("file")
+    if not getattr(upload, "filename", ""):
+        return JSONResponse({"ok": False, "error": "Missing 'file'"}, status_code=400)
+
+    try:
+        dest = safe_dest(upload.filename, (form.get("category") or "general").strip())
+    except ValueError as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=400)
+
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(await upload.read())
+
+    try:
+        stats = await ingest_file_async(str(dest), dest.parent.name)
+    except Exception as e:
+        return JSONResponse({"ok": False, "file": dest.name, "error": str(e)}, status_code=500)
+
+    return JSONResponse({"ok": True, "file": dest.name, "category": dest.parent.name, **stats})
+
 async def mcp_health(request: Request):
     """GET /mcp/health -> optional MCP health endpoint."""
     return JSONResponse({"ok": True})
@@ -160,4 +183,5 @@ app.router.add_route("/ask", ask_handler, methods=["POST"])
 # Ingest
 app.router.add_route("/ingest", ingest_handler, methods=["POST"])
 app.router.add_route("/ingest/status", ingest_status_handler, methods=["GET"])
+app.router.add_route("/upload", upload_handler, methods=["POST"])
 # Test tools directly

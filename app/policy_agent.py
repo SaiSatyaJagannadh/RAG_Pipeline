@@ -1,5 +1,7 @@
 import json
 import asyncio
+import os
+import sys
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -8,7 +10,17 @@ from langchain_openai import ChatOpenAI
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain.agents import create_agent
 from dotenv import load_dotenv
+
+# Importable both as `streamlit run policy_agent.py` from app/ and as app/policy_agent.py from root.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 load_dotenv()
+# Streamlit Cloud supplies config via st.secrets; the RAG modules read os.environ at import time.
+try:
+    for _k, _v in st.secrets.items():
+        os.environ.setdefault(_k, str(_v))
+except Exception:
+    pass  # no secrets.toml (local runs use .env)
 # ----------------------------
 # MCP + Agent Configuration
 # ----------------------------
@@ -120,6 +132,31 @@ with st.sidebar:
     model = st.text_input("OpenAI Model", value="gpt-4o-mini")
     temperature = st.slider("LLM Temperature", 0.0, 1.0, 0.0, 0.1)
     st.caption("MCP server should expose tools: rag_ask, approve, reject.")
+
+    st.divider()
+    st.header("Knowledge base")
+    kb_file = st.file_uploader("Upload policy doc", type=["pdf", "docx", "md", "txt"])
+    kb_category = st.text_input("Category", value="policies",
+                                help="Becomes the retrieval filter; 'policies' is what the agent queries.")
+    if st.button("Ingest into RAG", use_container_width=True):
+        if not kb_file:
+            st.error("Pick a file first.")
+        else:
+            with st.spinner(f"Ingesting {kb_file.name}..."):
+                try:
+                    # Imported lazily: needs DATABASE_URL/OPENAI_API_KEY at import time,
+                    # so a missing secret fails here instead of blanking the whole page.
+                    from app.ingest import ingest_file_async
+                    from app.uploads import safe_dest
+
+                    dest = safe_dest(kb_file.name, kb_category.strip())
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    dest.write_bytes(kb_file.getvalue())
+                    stats = asyncio.run(ingest_file_async(str(dest), dest.parent.name))
+                except Exception as e:
+                    st.error(f"Ingest failed: {e}")
+                else:
+                    st.success(f"Ingested {dest.name} → {stats['chunks']} chunks into '{dest.parent.name}'")
 
 uploaded = st.file_uploader("Upload claims JSON", type=["json"])
 

@@ -15,6 +15,12 @@ uvicorn app.api:app --reload --port 8000
 curl -X POST http://localhost:8000/ingest
 curl http://localhost:8000/ingest/status
 
+# Upload + ingest a single doc (pdf/docx/md/txt)
+curl -X POST http://localhost:8000/upload -F file=@doc.pdf -F category=policies
+
+# Upload path sanitization check (no project deps needed)
+python test_upload.py
+
 # Ask
 curl -X POST http://localhost:8000/ask -H 'Content-Type: application/json' \
   -d '{"question":"How many PTO days carry forward?","category":"policies"}'
@@ -26,7 +32,7 @@ cd app && python -m streamlit run policy_agent.py
 cd app && python eval_ragas.py
 ```
 
-There is no test suite, linter, or CI. `seed/qna_test.json` is **JSONL** despite the `.json` extension.
+No linter or CI. The only test is `test_upload.py`. `seed/qna_test.json` is **JSONL** despite the `.json` extension.
 
 ## Required env (`.env`, gitignored, read by docker-compose `env_file`)
 
@@ -53,9 +59,11 @@ pgvector top-`RETRIEVAL_K` (async `AsyncPGVectorStore`) → Cohere `rerank-multi
 
 ### Ingest (`app/ingest.py`)
 
-Loader picked by extension (`.md`/`.pdf`/`.docx`/`.txt`); anything else is silently skipped — several files in `data/Course_files/` (`.pptx`, `.key`) never get ingested. Per-file failures are caught and logged, chunking failures abort. Chunks 900/120. Reruns **append** — there is no dedupe or delete, so ingesting twice duplicates every chunk. An HNSW cosine index is (re)applied after each run.
+Loader picked by extension via the `LOADERS` map, whose keys must match `uploads.SUPPORTED_EXTS` (module-level assert). `_load_one` handles one file and is shared by the full `data/` sweep (`run_ingest_async`) and the single-file upload path (`ingest_file_async`). Unsupported extensions are silently skipped — several files in `data/Course_files/` (`.pptx`, `.key`) never get ingested. Per-file failures are caught and logged, chunking failures abort. Chunks 900/120. Reruns **append** — there is no dedupe or delete, so ingesting twice duplicates every chunk. An HNSW cosine index is (re)applied after each run.
 
-Ingest runs as a single background `asyncio.Task` guarded by `_ingest_lock` + `_ingest_last` module state in `api.py`; a second POST while running returns 409. State is in-process, so it resets on reload/restart.
+`POST /upload` (multipart `file` + `category`) writes into `data/<category>/` and ingests that one file synchronously. `uploads.safe_dest` is the trust boundary: it strips directory components from the filename, rejects dotfiles and unsupported extensions, and constrains `category` to `[A-Za-z0-9_-]{1,40}` — it lives in a dependency-free module so `test_upload.py` runs without the LLM stack installed. Uploads land in a bind-mounted `data/`, so they survive container restarts and are picked up by later full ingests (which will then duplicate them).
+
+The full `data/` ingest runs as a single background `asyncio.Task` guarded by `_ingest_lock` + `_ingest_last` module state in `api.py`; a second POST while running returns 409. State is in-process, so it resets on reload/restart.
 
 ## Gotchas
 
