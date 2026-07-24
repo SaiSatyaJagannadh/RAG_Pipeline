@@ -25,7 +25,8 @@ except Exception:
 # ----------------------------
 # MCP + Agent Configuration
 # ----------------------------
-DEFAULT_MCP_URL = "http://localhost:8000/mcp"
+# Streamlit Cloud can't reach localhost — set MCP_URL in st.secrets to your public tunnel.
+DEFAULT_MCP_URL = os.getenv("MCP_URL", "http://localhost:8000/mcp")
 
 SYSTEM_PROMPT = """You are an HR Expense Compliance Agent.
 Process each claim in these steps:

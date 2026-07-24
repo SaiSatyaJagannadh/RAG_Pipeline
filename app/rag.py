@@ -40,7 +40,9 @@ set_llm_cache(
     RedisSemanticCache(
         redis_url=REDIS_URL,
         embeddings =embeddings,
-        distance_threshold = 0.98
+        # Cosine distance, 0 = identical prompt. At 0.98 every question matched the
+        # first cached entry, so all answers came back as whatever was cached first.
+        distance_threshold=float(os.getenv("SEMANTIC_CACHE_DISTANCE", "0.1")),
     )
 )
 
