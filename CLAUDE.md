@@ -41,7 +41,7 @@ Optional: `DATA_DIR` (default `data`), `RETRIEVAL_K` (default `5`).
 
 ## Architecture
 
-Single Starlette app that **is** the MCP server — `app/api.py` does `app = mcp.streamable_http_app()` then bolts REST routes onto that same router. So `/mcp` (streamable HTTP), `/ask`, `/ingest`, `/` (static UI) all share one ASGI app. FastAPI is in requirements but unused; don't add FastAPI routers, use `app.router.add_route`.
+Single Starlette app that **is** the MCP server — `app/api.py` does `app = mcp.streamable_http_app()` then bolts REST routes onto that same router. So `/mcp` (streamable HTTP), `/ask`, `/ingest`, `/upload`, `/docs` (sidebar listing of `data/` folders + files), `/` (static UI — a single self-contained `app/static/index.html`, no CSS file) all share one ASGI app. FastAPI is in requirements but unused; don't add FastAPI routers, use `app.router.add_route`.
 
 Two consumers of the same backend:
 - **HTTP**: `/ask` → `rag.answer_with_docs_async` → returns `{answer, sources, contexts}`.
@@ -49,7 +49,7 @@ Two consumers of the same backend:
 
 ### Category is the central abstraction
 
-`ingest._load_docs` derives `category` from the **top-level folder name under `data/`** (`policies`, `faqs`, `guides`, `announcements`, `handbooks`, …) and writes it to `d.metadata["category"]`. That becomes a real Postgres **column**, not JSON — `utils.get_vector_store` declares `metadata_columns=["category"]` against `langchain_pg_embedding`, and `rag._build_chain` filters retrieval with `{"category": category}`. Adding a data folder adds a category with no code change; renaming one silently breaks any caller passing the old string (`/ask` defaults to `"policies"`, `policy_agent.py`'s prompt hardcodes `"policies"`).
+`ingest._load_docs` derives `category` from the **top-level folder name under `data/`** (`policies`, `faqs`, `guides`, `announcements`, `handbooks`, …) and writes it to `d.metadata["category"]`. That becomes a real Postgres **column**, not JSON — `utils.get_vector_store` declares `metadata_columns=["category"]` against `langchain_pg_embedding`, and `rag._build_chain` filters retrieval with `{"category": category}`. Adding a data folder adds a category with no code change; renaming one silently breaks any caller passing the old string (`policy_agent.py`'s prompt hardcodes `"policies"`). `/ask` with no/empty `category` searches **all** categories (no filter). The UI uploads each document under its own category (slug of the filename), which is how "chat with this document" is scoped — there is no per-file filter, since `metadata_columns` only carries `category`.
 
 The table is created by `init-db/init.sql`, which only runs on **first** postgres volume init. Changing the schema or embedding dimension (1536, from `text-embedding-3-small`) requires `docker compose down -v`.
 

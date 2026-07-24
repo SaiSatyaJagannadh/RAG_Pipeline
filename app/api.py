@@ -16,7 +16,7 @@ from mcp.server.fastmcp import FastMCP
 # ---- Your RAG + Ingest imports ----
 from .rag import answer_with_docs_async            # must return (answer, sources, contexts)
 from .ingest import run_ingest_async, ingest_file_async
-from .uploads import safe_dest
+from .uploads import safe_dest, DATA_DIR, SUPPORTED_EXTS
 
 # ========== MCP SERVER ==========
 mcp = FastMCP(
@@ -96,8 +96,8 @@ async def ask_handler(request: Request):
         return JSONResponse({"error": "Missing 'question'"}, status_code=400)
 
     start = time.perf_counter()
-    # Optional: category to scope retrieval (adjust to your needs)
-    category = payload.get("category") or "policies"
+    # Empty category = search every document (rag._build_chain skips the filter).
+    category = payload.get("category") or None
 
     answer, sources, contexts = await answer_with_docs_async(question, category)
     elapsed = time.perf_counter() - start
@@ -167,6 +167,17 @@ async def upload_handler(request: Request):
 
     return JSONResponse({"ok": True, "file": dest.name, "category": dest.parent.name, **stats})
 
+async def docs_handler(request: Request):
+    """GET /docs -> categories on disk and the files in them, for the sidebar."""
+    root = Path(DATA_DIR)
+    cats = [
+        {"category": d.name,
+         "files": sorted(f.name for f in d.iterdir()
+                         if f.suffix.lower() in SUPPORTED_EXTS)}
+        for d in sorted(root.iterdir()) if d.is_dir()
+    ] if root.exists() else []
+    return JSONResponse({"ok": True, "categories": [c for c in cats if c["files"]]})
+
 async def mcp_health(request: Request):
     """GET /mcp/health -> optional MCP health endpoint."""
     return JSONResponse({"ok": True})
@@ -184,4 +195,5 @@ app.router.add_route("/ask", ask_handler, methods=["POST"])
 app.router.add_route("/ingest", ingest_handler, methods=["POST"])
 app.router.add_route("/ingest/status", ingest_status_handler, methods=["GET"])
 app.router.add_route("/upload", upload_handler, methods=["POST"])
+app.router.add_route("/docs", docs_handler, methods=["GET"])
 # Test tools directly
