@@ -11,9 +11,10 @@ https://employee-expenses-tracking-agent.streamlit.app/
 
 Main file path: `app/policy_agent.py`
 
-No `packages.txt` — the loaders are pure-Python wheels (pymupdf for pdf, unstructured[docx]
-for docx). Adding `libmagic1` breaks the build: Streamlit's image mixes Debian bullseye and
-trixie repos and the dependency versions conflict.
+No `packages.txt` — the loaders are pure-Python wheels (pymupdf for pdf, docx2txt for docx).
+Adding `libmagic1` breaks the build: Streamlit's image mixes Debian bullseye and trixie repos
+and the versions conflict. Don't add `unstructured` back either — it downloads a spaCy model
+at runtime into a read-only site-packages.
 
 Secrets (Settings -> Secrets), same keys as `.env`:
 

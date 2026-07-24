@@ -10,12 +10,9 @@ tiktoken
 # DB / pool
 psycopg[binary,pool]
 
-# Ingestion helpers
-# Only .md and .docx go through unstructured; .pdf uses pymupdf, so the
-# [pdf]/[image] extras (onnxruntime, opencv, OCR) are not needed.
-unstructured[docx]
-markdown
+# Ingestion helpers (pure-python; no unstructured/spacy/OCR — see LOADERS in ingest.py)
 pymupdf
+docx2txt
 
 #Langchain
 langchain

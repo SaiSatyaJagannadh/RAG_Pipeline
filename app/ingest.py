@@ -5,17 +5,20 @@ from pathlib import Path
 
 from langchain_classic.docstore.document import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.document_loaders import UnstructuredMarkdownLoader, PyMuPDFLoader, UnstructuredWordDocumentLoader,TextLoader
+from langchain_community.document_loaders import PyMuPDFLoader, Docx2txtLoader, TextLoader
 
 from .utils import get_vector_store
 from langchain_postgres.v2.indexes import HNSWIndex, DistanceStrategy
 
 from .uploads import DATA_DIR, SUPPORTED_EXTS
 
+# No unstructured loaders: they pull a spacy model at runtime, which fails on
+# read-only deploys (Streamlit Cloud). Chunking is done by the text splitter anyway,
+# so plain text extraction is all these need to provide.
 LOADERS = {
-    ".md": UnstructuredMarkdownLoader,
+    ".md": TextLoader,
     ".pdf": PyMuPDFLoader,
-    ".docx": UnstructuredWordDocumentLoader,
+    ".docx": Docx2txtLoader,
     ".txt": TextLoader,
 }
 assert LOADERS.keys() == SUPPORTED_EXTS, "LOADERS and uploads.SUPPORTED_EXTS drifted"
